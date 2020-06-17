@@ -1,0 +1,153 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: db
+  name: postgresql-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: db
+  name: postgresql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: db
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: postgresql
+          image: postgresql-12-centos7
+          imagePullPolicy: Always
+          env:
+          - name: "POSTGRESQL_USER"
+            valueFrom:
+              secretKeyRef:
+                name: database
+                key: DB_ADMIN_USER
+          - name: "POSTGRESQL_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: database
+                key: DB_ADMIN_PASSWORD
+          - name: "DB_USER"
+            valueFrom:
+              secretKeyRef:
+                name: database
+                key: DB_USER
+          - name: "DB_PASSWORD"
+            valueFrom:
+              secretKeyRef:
+                name: database
+                key: DB_PASSWORD
+          - name: "POSTGRESQL_DATABASE"
+            value: "unblu"
+          command: ["bash"]
+          args: ["/init-script/init.sh"]
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /usr/libexec/check-container
+            initialDelaySeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /var/lib/pgsql/data
+              name: postgresql-data
+            - mountPath: /init-script
+              name: init-script
+              readOnly: true
+        - name: postgres-exporter
+          image: postgres_exporter
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 10m
+            limits:
+              memory: 128Mi
+              cpu: 100m
+          env:
+            - name: DATA_SOURCE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: database
+                  key: DB_ADMIN_USER
+            - name: DATA_SOURCE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: database
+                  key: DB_ADMIN_PASSWORD
+            - name: DATA_SOURCE_URI
+              value: postgresql:5432/unblu?sslmode=disable
+          ports:
+          - containerPort: 9187
+      securityContext:
+        runAsUser: 26
+        fsGroup: 26
+      volumes:
+        - name: postgresql-data
+          persistentVolumeClaim:
+            claimName: postgresql-data
+        - name: init-script
+          configMap:
+            name: postgres-init-script-configmap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: db
+  name: postgresql
+spec:
+  ports:
+  - name: 5432-tcp
+    port: 5432
+  selector:
+    app: db
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script-configmap
+data:
+  init.sh: |-
+    #!/bin/bash
+    cat /init-script/setup_template.sql | envsubst  > ~/setup.sql
+    # patch the run-postgresql script to execute create_unblu_user.sh after create_users
+    sed -e '/create_users/r /init-script/create_unblu_user.sh' /usr/bin/run-postgresql > ~/run-postgresql
+    chmod +x ~/run-postgresql
+    ~/run-postgresql
+  create_unblu_user.sh: |
+    psql -d $POSTGRESQL_DATABASE -f ~/setup.sql
+  setup_template.sql: |-
+    create user $DB_USER with password '$DB_PASSWORD';
+    alter default privileges for user $POSTGRESQL_USER in schema public grant select, update, insert, delete on tables to $DB_USER;
+    alter default privileges for user $POSTGRESQL_USER in schema public grant usage, select on sequences to $DB_USER;
+    grant usage, create on schema public to $POSTGRESQL_USER;

@@ -1,0 +1,65 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-kube-state-metrics
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    component: kube-state-metrics
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: prometheus
+    component: kube-state-metrics
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-kube-state-metrics
+  labels:
+    component: kube-state-metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: kube-state-metrics
+  template:
+    metadata:
+      labels:
+        component: kube-state-metrics
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus-kube-state-metrics
+          image: kube-state-metrics
+          imagePullPolicy: Always
+          args:
+            - --collectors=pods,deployments,services,statefulsets 
+            - --namespace=$(PROM_NAMESPACE)
+            - --telemetry-port=8181
+          ports:
+            - name: metrics
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

@@ -1,0 +1,41 @@
+resources:
+- prometheus.yaml
+- kube-state-metrics.yaml
+- alertmanager.yaml
+- blackbox-exporter.yaml
+
+commonLabels:
+  app: prometheus
+
+vars:
+  - name: PROM_NAMESPACE
+    objref:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: prometheus-kube-state-metrics
+    fieldref:
+      fieldpath: metadata.namespace
+
+configMapGenerator:
+- name: prometheus-server-config
+  files:
+    - config/prometheus.yml
+    - config/alerts.yml
+    - config/rules.yml
+- name: alertmanager-config
+  files:
+    - config/alertmanager.yml
+
+images:
+  - name: prom/alertmanager
+    newName: docker.io/prom/alertmanager
+    newTag: v0.20.0
+  - name: prom/blackbox-exporter
+    newName: docker.io/prom/blackbox-exporter
+    newTag: v0.16.0
+  - name: prom/prometheus
+    newName: docker.io/prom/prometheus
+    newTag: v2.18.0
+  - name: kube-state-metrics
+    newName: quay.io/coreos/kube-state-metrics
+    newTag: v1.9.4

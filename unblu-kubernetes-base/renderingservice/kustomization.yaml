@@ -1,0 +1,11 @@
+resources:
+- renderingservice.yaml
+
+commonLabels:
+  app: unblu
+  component: renderingservice
+
+images:
+- name: gcr.io/unblu-containerrepo-public/rendering-service
+  newTag: 2.0.20
+

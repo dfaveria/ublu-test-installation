@@ -1,0 +1,9 @@
+bases:
+- ../_internal/nginx
+- ../_internal/haproxy
+
+commonLabels:
+  app: unblu
+
+resources:
+- route.yaml

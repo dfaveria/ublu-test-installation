@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: turn
+spec:
+  type: LoadBalancer
+  sessionAffinity: ClientIP
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: turn-udp
+spec:
+  type: LoadBalancer
+  sessionAffinity: ClientIP

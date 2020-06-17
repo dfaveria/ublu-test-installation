@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: blackbox-exporter
+spec:
+  selector:
+    app: prometheus
+    component: blackbox-exporter
+  ports:
+  - port: 80
+    targetPort: 9115
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox-exporter
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+      component: blackbox-exporter
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        component: blackbox-exporter
+    spec:
+      containers:
+      - name: blackbox-exporter
+        image: prom/blackbox-exporter
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+        ports:
+        - containerPort: 9115
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http

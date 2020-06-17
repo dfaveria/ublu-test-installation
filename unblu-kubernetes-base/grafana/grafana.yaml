@@ -1,0 +1,158 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana
+data:
+  grafana.ini: |
+    [analytics]
+    reporting_enabled = false
+    check_for_updates = false
+    [log]
+    mode = console
+    [paths]
+    data = /var/lib/grafana/data
+    logs = /var/log/grafana
+    plugins = /var/lib/grafana/plugins
+    provisioning = /etc/grafana/provisioning
+    [snapshots]
+    external_snapshot_url = https://grafana.unblu.com
+    external_snapshot_name = Send to Unblu
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - access: proxy
+      isDefault: true
+      name: Prometheus
+      type: prometheus
+      url: "http://prometheus:80"
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+    - name: 'bucket a'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /etc/grafana/dashboards/a
+    - name: 'bucket b'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /etc/grafana/dashboards/b
+    - name: 'bucket c'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /etc/grafana/dashboards/c
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+spec:
+  type: ClusterIP
+  selector:
+    component: grafana
+  ports:
+    - name: service
+      port: 80
+      protocol: TCP
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      component: grafana
+  template:
+    metadata:
+      labels:
+        component: grafana
+      annotations:
+        prometheus.io/port: "3000"
+        prometheus.io/scrape: "true"
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: config
+              mountPath: /etc/grafana/grafana.ini
+              subPath: grafana.ini
+            - name: config
+              mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
+              subPath: datasources.yaml
+            - name: config
+              mountPath: /etc/grafana/provisioning/dashboards/dashboards.yaml
+              subPath: dashboards.yaml
+            - name: grafana-dashboards-a
+              mountPath: /etc/grafana/dashboards/a
+              readOnly: true
+            - name: grafana-dashboards-b
+              mountPath: /etc/grafana/dashboards/b
+              readOnly: true
+            - name: grafana-dashboards-c
+              mountPath: /etc/grafana/dashboards/c
+              readOnly: true
+          ports:
+            - name: grafana
+              containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana
+                  key: admin-user
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana
+                  key: admin-password
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: grafana
+            initialDelaySeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: grafana
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes: # Volumes need to be public as Grafana user is defined in https://github.com/grafana/grafana/blob/master/Dockerfile
+        - name: config
+          configMap:
+            name: grafana
+            defaultMode: 0444
+        - name: grafana-dashboards-a
+          configMap:
+            name: grafana-dashboards-a
+            defaultMode: 0444
+        - name: grafana-dashboards-b
+          configMap:
+            name: grafana-dashboards-b
+            defaultMode: 0444
+        - name: grafana-dashboards-c
+          configMap:
+            name: grafana-dashboards-c
+            defaultMode: 0444

@@ -1,0 +1,19 @@
+bases:
+- ../_internal/nginx
+- ../_internal/haproxy
+
+resources:
+- ingress.yaml
+
+commonLabels:
+  app: unblu
+
+patchesStrategicMerge:
+- nodeport.yaml
+
+secretGenerator:
+- name: ingress-tls
+  files:
+    - certs/tls.crt
+    - certs/tls.key
+  type: "kubernetes.io/tls"

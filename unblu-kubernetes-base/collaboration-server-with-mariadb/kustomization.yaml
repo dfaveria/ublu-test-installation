@@ -1,0 +1,26 @@
+resources:
+- mariadb.yaml
+- database-secret.yaml
+
+bases:
+- ../collaboration-server
+
+patchesStrategicMerge:
+- patch-internal-db.yaml
+
+configMapGenerator:
+- name: collaboration-server-config
+  behavior: merge
+  files:
+    - unblu-database.properties
+
+images:
+  - name: mariadb
+    newName: docker.io/mariadb
+    newTag: "10.4"
+  - name: prom/mysqld-exporter
+    newName: docker.io/prom/mysqld-exporter
+    newTag: v0.11.0
+  - name: busybox
+    newName: docker.io/busybox
+    newTag: latest

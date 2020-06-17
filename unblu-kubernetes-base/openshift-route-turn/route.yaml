@@ -1,0 +1,13 @@
+kind: Route   
+apiVersion: v1
+metadata:
+  name: coturn-tcp-tls-passthrough
+spec:
+  host: turn.unblu-test.com
+  port:
+    targetPort: turn-s-tcp
+  to:
+    kind: Service
+    name: turn
+  tls:
+    termination: passthrough

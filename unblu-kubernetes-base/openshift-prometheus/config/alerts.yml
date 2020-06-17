@@ -1,0 +1,124 @@
+groups:
+- name: Unblu
+  rules:
+  - alert: KafkaUp
+    expr: sum(up{component="kafka"}) < 2
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: "Kafka is unavailable!"
+      description: "Only {{ $value }} Kafka instance is ready. At least 2 instances should be ready at all times!"
+  - alert: ZooKeeperUp
+    expr: sum(up{component="zookeeper"}) < 2
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: "ZooKeeper is unavailable!"
+      description: "Only {{ $value }} ZooKeeper instance is ready. At least 2 instances should be ready at all times!"
+  - alert: FailedLogins
+    expr: rate(session_logins_total{result="failed"}[1m]) > 1
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "More than 1 failed logins per second"
+      description: "{{ $value }} failed logins in the last minute on {{ $labels.kubernetes_pod_name }}"
+  - alert: LogErrors
+    expr: rate(logback_events_total{level="error"}[1m]) > 0.1
+    for: 1m
+    labels:
+      severity: high
+    annotations:
+      summary: "Repeated errors in the server log"
+      description: "{{ $value }} error logs per second in the last minute on {{ $labels.kubernetes_pod_name }}"
+  - alert: CollabServerUnavailable
+    expr: kube_deployment_status_replicas_unavailable{deployment="collaboration-server"} > 0
+    for: 1m
+    labels:
+      severity: high
+    annotations:
+      summary: "Collaboration server pod is unavailable"
+      description: ""
+  - alert: RenderingServiceUnavailable
+    expr: kube_deployment_status_replicas_unavailable{deployment="renderingservice"} > 0
+    for: 2m
+    labels:
+      severity: medium
+    annotations:
+      summary: "Rendering service pod is unavailable"
+      description: "Verify that enough cluster resources are available"
+  - alert: CollabServerJettyStarvation
+    expr: jetty_threads_busy{component="collaboration-server"} / jetty_threads_config_max{component="collaboration-server"} > 0.7
+    for: 1m
+    labels:
+      severity: high
+    annotations:
+      summary: "Collaboration server is low on idle threads"
+      description: "More than 70% of the Jetty threads are busy on {{ $labels.kubernetes_pod_name }}"
+  - alert: ProbeFails
+    expr: probe_success < 1
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "{{ $labels.probe_name }} probe fails"
+      description: "The {{ $labels.probe_name }} HTTP probe calling {{ $labels.probe_path }} on the service {{ $labels.kubernetes_service}} fails."
+  - alert: ResponseCode5xx
+    expr: rate(haproxy_frontend_http_responses_total{frontend="http-in", code="5xx"}[1m]) > 0.3
+    for: 1m
+    labels:
+      severity: high
+    annotations:
+      summary: "Repeated HTTP Server errors coming in HAProxy"
+      description: "Higher number of server related 5XX http response codes spotted in the haproxy nodes"
+  - alert: ResponseCode4xx
+    expr: rate(haproxy_frontend_http_responses_total{frontend="http-in", code="4xx"}[1m]) > 0.5
+    for: 1m
+    labels:
+      severity: high
+    annotations:
+      summary: "Repeated HTTP Client errors coming in HAProxy"
+      description: "High number of client related 4XX http response codes spotted in the haproxy nodes"
+  - alert: CollabServerHighThreadCount
+    # TODO decrease to 1000 as soon as UNBLU-8944 is fixed
+    expr: process_threads{component="collaboration-server"} > 2000 or jvm_threads_peak_threads{component="collaboration-server"} > 2000
+    for: 1m
+    labels:
+      severity: high
+    annotations:
+      summary: "High number of threads in the collaboration server"
+      description: "Collaboration server {{ $labels.kubernetes_pod_name }} uses {{ $value }} threads (limit=1000)"
+  - alert: PrometheusLowDiskSpaceWarning
+    expr: prometheus_tsdb_storage_blocks_bytes > 7000000000 and prometheus_tsdb_storage_blocks_bytes < 7500000000
+    for: 30s
+    labels:
+      severity: high
+    annotations:
+      summary: "Prometheus is getting low on disk space"
+      description: "Current disk space usage on Prometheus more than 7GiB"
+  - alert: PrometheusLowDiskSpaceError
+    expr: prometheus_tsdb_storage_blocks_bytes > 7500000000
+    for: 10s
+    labels:
+      severity: critical
+    annotations:
+      summary: "Low disk space on prometheus"
+      description: "Current disk space usage on Prometheus is more than 7.5GiB"
+  - alert: CollabServerHighHeapUsage
+    expr: sum by (kubernetes_pod_name) (jvm_memory_used_bytes{component="collaboration-server", area="heap"}) / sum by (kubernetes_pod_name) (jvm_memory_max_bytes{component="collaboration-server", area="heap"}) > 0.85
+    for: 10m
+    labels:
+      severity: high
+    annotations:
+      summary: "Collaboration server is low low on free memory"
+      description: "Heap of the Collaboration server {{ $labels.kubernetes_pod_name }} is more than 85% full"
+  - alert: CacheEvictions
+    expr: max by (name) (rate(cache_evictions_total{component="collaboration-server"}[1m])) > 10
+    for: 5m
+    labels:
+      severity: medium
+    annotations:
+      summary: Cache evictions in cache {{ $labels.name }}
+      description: Frequent cache evictions usually cause performance issues. Use com.unblu.cache.defaultMaxElementsHeap to configure a larger cache.

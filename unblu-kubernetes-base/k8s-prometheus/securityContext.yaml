@@ -1,0 +1,10 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-server
+spec:
+  template:
+    spec:
+      securityContext: # By default, Prometheus runs as 'nobody'. Change that to another user so that we can write to the mounted disk. https://github.com/prometheus/prometheus/blob/master/Dockerfile
+        runAsUser: 1000
+        fsGroup: 2000

@@ -1,0 +1,136 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zookeeper-config
+  labels:
+    component: zookeeper
+data:
+  zk.properties: |-
+    com.unblu.zookeeper.server.useEmbeddedConnection=false
+    com.unblu.zookeeper.server.quorumServers=zookeeper-0.zookeeper-hs.$(ZOO_NAMESPACE).svc.cluster.local:2888:3888,zookeeper-1.zookeeper-hs.$(ZOO_NAMESPACE).svc.cluster.local:2888:3888,zookeeper-2.zookeeper-hs.$(ZOO_NAMESPACE).svc.cluster.local:2888:3888
+    com.unblu.logging.consoleUseJsonLogFormat=true
+    # systempath needs to be available for prometheus metrics servlet
+    com.unblu.systempath.enabled=true
+    com.unblu.metrics.applicationTag=unblu-zookeeper-server
+    com.unblu.server.logging.level.org.apache.zookeeper.server.NIOServerCnxn=ERROR
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: zookeeper-hs
+  labels:
+    component: zookeeper
+spec:
+  ports:
+  - name: server
+    port: 2888
+  - name: leader-election
+    port: 3888
+  clusterIP: None
+  selector:
+    component: zookeeper
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  labels:
+    component: zookeeper
+spec:
+  ports:
+  - name: client
+    port: 2181
+  selector:
+    component: zookeeper
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: zookeeper-pdb
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      component: zookeeper
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  labels:
+    component: zookeeper
+spec:
+  replicas: 3
+  podManagementPolicy: Parallel
+  serviceName: zookeeper-hs
+  selector:
+    matchLabels:
+      component: zookeeper
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        component: zookeeper
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7080"
+        prometheus.io/path: "/sys-unblu/prometheus"
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - args:
+        - zookeeper-cluster
+        image: gcr.io/unblu-containerrepo-public/collaborationserver-centos7
+        imagePullPolicy: Always
+        name: zookeeper
+        ports:
+        - name: client
+          containerPort: 2181
+        - name: server
+          containerPort: 2888
+        - name: leader-election
+          containerPort: 3888
+        - name: jetty-server
+          containerPort: 7080
+        readinessProbe:
+          httpGet:
+            path: /sys-unblu/readiness
+            port: jetty-server
+          initialDelaySeconds: 60
+          timeoutSeconds: 2
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - |
+              [ "$(echo "ruok" | nc -w 2 localhost 2181 2>/dev/null)" == "imok" ]
+          initialDelaySeconds: 60
+        volumeMounts:
+        - mountPath: /etc/unblu
+          name: zookeeper-config
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+        env:
+          - name: ZOOKEEPER_CLUSTER_JAVA_PARAMS
+            value: "-Xms200m -Xmx350m"
+      volumes:
+      - configMap:
+          defaultMode: 0440
+          name: zookeeper-config
+        name: zookeeper-config
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchLabels:
+                  component: zookeeper
+  volumeClaimTemplates: [] # fix for https://github.com/kubernetes-sigs/kustomize/issues/504

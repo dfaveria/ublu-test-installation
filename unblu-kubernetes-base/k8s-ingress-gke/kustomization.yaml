@@ -1,0 +1,11 @@
+bases:
+- ../k8s-ingress
+
+resources:
+- gke-backend-config.yaml
+
+commonLabels:
+  app: unblu
+
+patchesStrategicMerge:
+- gke-timeout.yaml

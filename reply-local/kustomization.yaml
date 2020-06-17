@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: unblu-test
+
+bases: 
+- ../unblu-kubernetes-base/collaboration-server
+- ../unblu-kubernetes-base/openshift-prometheus
+- ../unblu-kubernetes-base/grafana
+- ../unblu-kubernetes-base/openshift-route
+
+patchesStrategicMerge:
+- route.yaml
+- limit-replicas.yaml
+- grafana-secret.yaml
+
+resources:
+- database-secret.yaml
+
+configMapGenerator:
+- name: collaboration-server-config
+  behavior: merge
+  files:
+    - unblu-customer.properties
+

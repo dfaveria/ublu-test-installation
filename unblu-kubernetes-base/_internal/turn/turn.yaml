@@ -1,0 +1,133 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: turn
+spec:
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  ports:
+  - name: turn-s-tcp
+    port: 5349
+    protocol: TCP
+  - name: turn-tcp
+    port: 3478
+    protocol: TCP
+  - name: turn-443-tcp
+    port: 443
+    protocol: TCP
+    targetPort: 5349
+  selector:
+    app: unblu
+    component: turn
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: turn-udp
+spec:
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  ports:
+  - name: turn-s-udp
+    port: 5349
+    protocol: UDP
+  - name: turn-udp
+    port: 3478
+    protocol: UDP
+  selector:
+    app: unblu
+    component: turn
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: turn
+spec:
+  replicas: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      component: turn
+  template:
+    metadata:
+      labels:
+        component: turn
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - turn
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - image: cluster/coturn
+        imagePullPolicy: Always
+        name: turnserver
+        command: 
+        - "turnserver"
+        - "-v"
+        - "-n"
+        - "-f"
+        - "--pidfile"
+        - "/var/tmp/turnserver.pid"
+        - "--log-file=stdout"
+        - "--realm=unblu.com"
+        - "--use-auth-secret"
+        - "--static-auth-secret=$(AUTH_SECRET)"
+        - "--cert=/usr/local/etc/ssl/tls.crt"
+        - "--pkey=/usr/local/etc/ssl/tls.key"
+        - "--dh2066"
+        - "--cipher-list=ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AES:RSA+3DES:!ADH:!AECDH:!MD5:!RC4"
+        - "$(USERDB)"
+        - "$(STATSDB)"
+        ports:
+        - name: turn-s
+          containerPort: 5349
+          protocol: TCP
+        - name: turn-s-udp
+          containerPort: 5349
+          protocol: UDP
+        - name: turn
+          containerPort: 3478
+          protocol: TCP
+        - name: turn-udp
+          containerPort: 3478
+          protocol: UDP
+        env:
+          - name: USERDB
+            value: ""
+          - name: STATSDB
+            value: ""
+        envFrom:
+        - secretRef:
+            name: turn
+        volumeMounts:
+        - name: ssl-keys
+          mountPath: "/usr/local/etc/ssl/"
+          readOnly: true
+        readinessProbe:
+          tcpSocket:
+            port: turn
+          initialDelaySeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: turn
+          initialDelaySeconds: 60
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+      volumes:
+      - name: ssl-keys
+        secret:
+          secretName: coturn-tls

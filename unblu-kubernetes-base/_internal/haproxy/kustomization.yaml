@@ -1,0 +1,19 @@
+resources:
+- haproxy.yaml
+
+commonLabels:
+  app: unblu
+  component: haproxy
+
+configMapGenerator:
+- name: haproxy-config
+  files:
+    - HAProxyManager.py
+
+images:
+  - name: cluster/haproxy
+    newName: gcr.io/unblu-containerrepo-public/cluster/haproxy
+    newTag: 1.9.15
+  - name: prom/haproxy-exporter
+    newName: docker.io/prom/haproxy-exporter
+    newTag: v0.10.0

@@ -1,0 +1,9 @@
+bases:
+- ../_internal/turn
+
+resources:
+- route.yaml
+
+commonLabels:
+  app: unblu
+  component: turn

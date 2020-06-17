@@ -1,0 +1,19 @@
+resources:
+- nginx.yaml
+
+commonLabels:
+  app: unblu
+  component: nginx
+
+configMapGenerator:
+- name: nginx-config
+  files:
+    - nginx.conf
+
+images:
+  - name: cluster/nginx
+    newName: gcr.io/unblu-containerrepo-public/cluster/nginx
+    newTag: 1.17.10
+  - name: nginx/nginx-prometheus-exporter
+    newName: docker.io/nginx/nginx-prometheus-exporter
+    newTag: 0.4.2

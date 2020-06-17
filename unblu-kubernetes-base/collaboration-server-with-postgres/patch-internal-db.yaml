@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collaboration-server
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox
+          imagePullPolicy: Always
+          command:
+          - sh
+          - -c
+          - |
+            until printf "." &&  echo "" | nc -z -w 2 postgresql 5432 2> /dev/null; do
+                sleep 2;
+            done;
+            echo 'postgresql OK'

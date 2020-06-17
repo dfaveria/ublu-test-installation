@@ -1,0 +1,43 @@
+:source-highlighter: rouge
+
+= Create a Thread Dump of a JVM running in a pod
+Michael Gysel <michael.gysel@unblu.com>
+
+Create the shell script `oc-jstack.sh` or `kubectl-jstack.sh` to make the thread dump for a specified pod, and/or create the shell script `oc-allpods-jstack.sh` or `kubectl-allpods-jstack.sh` to make a dump of all the currently running collaboration servers, each in a separate dump file. 
+Make sure  the shell scripts are executable (ex: `chmod u+x oc-jstack.sh`).
+
+.oc-jstack.sh
+[source,bash]
+----
+include::oc-jstack.sh[]
+----
+
+.oc-allpods-jstack.sh
+[source, bash]
+----
+include::oc-allpods-jstack.sh[]
+----
+
+.Extract from all currently running Collaboration Servers
+[source, bash]
+----
+./oc-allpods-jstack.sh
+Created file collaboration-server-7864cfc777-b4lg6.stack
+Created file collaboration-server-7864cfc777-t5ltj.stack
+----
+
+.Manually extract a Thread Dump
+[source,bash]
+----
+./oc-jstack.sh collaboration-server-5f7df556df-476s9
+----
+
+
+== Create it for several pods
+
+Run the following command:
+
+[source,bash]
+----
+oc get pods --no-headers -l "component=collaboration-server" -o custom-columns=":metadata.name" | xargs -L 1 ./oc-jstack.sh
+----

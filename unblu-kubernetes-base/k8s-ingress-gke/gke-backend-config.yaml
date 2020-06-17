@@ -1,0 +1,7 @@
+apiVersion: cloud.google.com/v1beta1
+kind: BackendConfig
+metadata:
+  name: load-balancer-config
+spec:
+  # 11 hours timeout due to websockets
+  timeoutSec: 39600

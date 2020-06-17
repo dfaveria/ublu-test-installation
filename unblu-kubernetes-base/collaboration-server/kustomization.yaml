@@ -1,0 +1,28 @@
+bases:
+- ../_internal/settings
+
+resources:
+- collaboration-server.yaml
+- zookeeper.yaml
+- kafka.yaml
+
+commonLabels:
+  app: unblu
+
+vars:
+  - name: ZOO_NAMESPACE
+    objref:
+      kind: Service
+      name: zookeeper
+      apiVersion: v1
+    fieldref:
+      fieldpath: metadata.namespace
+
+configMapGenerator:
+- name: collaboration-server-config
+  files:
+    - unblu.properties
+
+images:
+- name: gcr.io/unblu-containerrepo-public/collaborationserver-centos7
+  newTag: 6.11.2

@@ -1,0 +1,26 @@
+resources:
+- postgres.yaml
+- database-secret.yaml
+
+bases:
+- ../collaboration-server
+
+patchesStrategicMerge:
+- patch-internal-db.yaml
+
+configMapGenerator:
+- name: collaboration-server-config
+  behavior: merge
+  files:
+    - unblu-database.properties
+
+images:
+  - name: postgresql-12-centos7
+    newName: docker.io/centos/postgresql-12-centos7
+    newTag: "1"
+  - name: busybox
+    newName: docker.io/busybox
+    newTag: latest
+  - name: postgres_exporter
+    newName: docker.io/wrouesnel/postgres_exporter
+    newTag: v0.8.0

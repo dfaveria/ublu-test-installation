@@ -1,0 +1,19 @@
+resources:
+- turn.yaml
+- turn-secret.yaml
+
+commonLabels:
+  app: turn
+  component: turn
+
+secretGenerator:
+- name: coturn-tls
+  files:
+    - certs/tls.crt
+    - certs/tls.key
+  type: "kubernetes.io/tls"
+
+images:
+- name: cluster/coturn
+  newName: gcr.io/unblu-containerrepo-public/cluster/coturn
+  newTag: 4.5.1

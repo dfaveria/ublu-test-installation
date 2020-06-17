@@ -1,0 +1,30 @@
+resources:
+- grafana.yaml
+- grafana-secrets.yaml
+
+commonLabels:
+  app: grafana
+
+# Kubernetes has a limit on ConfigMap sizes, we therefore split the dashboards into several, small ConfigMaps
+configMapGenerator:
+- name: grafana-dashboards-a
+  files:
+    - grafana-dashboards/dashboard-database.json
+    - grafana-dashboards/dashboard-jvm.json  
+- name: grafana-dashboards-b
+  files:
+    - grafana-dashboards/dashboard-videorendering.json
+    - grafana-dashboards/dashboard-kafka-consumer.json
+    - grafana-dashboards/dashboard-mysql.json
+    - grafana-dashboards/dashboard-postgres.json
+    - grafana-dashboards/dashboard-clusteravailability.json
+- name: grafana-dashboards-c
+  files:
+    - grafana-dashboards/dashboard-unblu.json
+    - grafana-dashboards/dashboard-hikari.json
+    - grafana-dashboards/dashboard-zookeeper.json
+
+images:
+  - name: grafana/grafana
+    newName: docker.io/grafana/grafana
+    newTag: 6.7.3

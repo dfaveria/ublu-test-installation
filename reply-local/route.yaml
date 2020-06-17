@@ -1,0 +1,30 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: main-entry
+spec:
+# Add the host key to specify a host name.
+# By default OpenShift will generate a host name for you
+# with the format: <route-name>[-<namespace>].<suffix>
+  host: unblu.example.com
+#
+# Add the following TLS block to use a specific certificate.
+# By default OpenShift will use the router's default certificate.
+  tls:
+    certificate: |-
+      -----BEGIN CERTIFICATE-----
+      TODO: add cert!
+      -----END CERTIFICATE-----
+    key: |-
+      -----BEGIN RSA PRIVATE KEY-----
+      TODO: add key!
+      -----END RSA PRIVATE KEY-----
+    caCertificate: |-
+      -----BEGIN CERTIFICATE-----
+      TODO: add cert!
+      -----END CERTIFICATE-----
+# IMPORTANT:
+#   Please remove the Route patch entirely in case you have an empty `spec:`
+#     without either `tls` or `host`.
+#   A key without a value means that kustomize will remove all children 
+#     from the original definition.

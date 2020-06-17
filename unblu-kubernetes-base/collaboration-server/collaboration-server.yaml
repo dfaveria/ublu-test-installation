@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+imagePullSecrets:
+  - name: unblu-gcr-io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    component: collaboration-server
+  name: pre-stop
+data:
+  pre-stop.sh: |-
+    #!/bin/bash
+    set -e -u -o pipefail
+    echo "Wait for collaboration-server to terminate"
+    if hash curl 2>/dev/null; then
+      COMMAND="curl --fail"
+    elif hash wget 2>/dev/null; then
+      COMMAND="wget --spider"
+    else
+      echo "ERROR: No binary to make HTTP requests found!"
+    fi
+    while true
+    do
+        $COMMAND 127.0.0.1:9001/unblu/rest/systemStatus_d2dea491-3b1a-476d-b324-609fc163ae01 || break;
+        sleep 10
+    done
+    echo "Terminating"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: collaboration-server
+  name: collaboration-server
+spec:
+  ports:
+  - name: collaboration-server
+    port: 9001
+  selector:
+    component: collaboration-server
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    component: collaboration-server
+  name: collaboration-server
+spec:
+  progressDeadlineSeconds: 3600
+  replicas: 2
+  selector:
+    matchLabels:
+      component: collaboration-server
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /sys-unblu/prometheus
+        prometheus.io/port: "9001"
+        prometheus.io/scrape: "true"
+      labels:
+        component: collaboration-server
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - collaboration-server
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: collaboration-server
+        image: gcr.io/unblu-containerrepo-public/collaborationserver-centos7
+        imagePullPolicy: Always
+        args:
+        - collaboration-server
+        envFrom:
+        - secretRef:
+            name: database
+        - secretRef:
+            name: ldapsync
+            optional: true
+        - secretRef:
+            name: smtp
+            optional: true
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: CPU_REQUEST
+          valueFrom:
+            resourceFieldRef:
+              containerName: collaboration-server
+              resource: requests.cpu
+        - name: CPU_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: collaboration-server
+              resource: limits.cpu
+        - name: MEMORY_REQUEST
+          valueFrom:
+            resourceFieldRef:
+              containerName: collaboration-server
+              resource: requests.memory
+        - name: MEMORY_LIMITS
+          valueFrom:
+            resourceFieldRef:
+              containerName: collaboration-server
+              resource: limits.memory
+        - name: COLLAB_SERVER_JAVA_PARAMS
+          value: "-Xms512m -Xmx1600m"
+        livenessProbe:
+          httpGet:
+            path: /sys-unblu/liveness
+            port: collab-port
+          initialDelaySeconds: 240
+          timeoutSeconds: 10
+        ports:
+        - containerPort: 9001
+          name: collab-port
+        readinessProbe:
+          httpGet:
+            path: /sys-unblu/readiness
+            port: collab-port
+          initialDelaySeconds: 30
+          timeoutSeconds: 2
+          failureThreshold: 2
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 3000Mi
+          requests:
+            cpu: 500m
+            memory: 3000Mi
+        volumeMounts:
+        - mountPath: /etc/unblu
+          name: collaboration-server-config
+          readOnly: true
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - |
+          until [[ \
+          `echo "ruok" | nc -w 2 zookeeper-0.zookeeper-hs 2181 2>/dev/null` == "imok" || \
+          `echo "ruok" | nc -w 2 zookeeper-1.zookeeper-hs 2181 2>/dev/null` == "imok" || \
+          `echo "ruok" | nc -w 2 zookeeper-2.zookeeper-hs 2181 2>/dev/null` == "imok" \
+          ]]; do printf "."; sleep 1; done; echo "at least one zookeeper ready"
+        image: gcr.io/unblu-containerrepo-public/collaborationserver-centos7
+        imagePullPolicy: Always
+        name: wait-for-zookeeper
+      - command:
+        - sh
+        - -c
+        - |
+          until ( \
+          nc -z -w 2 kafka-0.kafka-hs 9092 2>/dev/null || \
+          nc -z -w 2 kafka-1.kafka-hs 9092 2>/dev/null || \
+          nc -z -w 2 kafka-2.kafka-hs 9092 2>/dev/null \
+          ); do printf "."; sleep 1; done; echo "at least one kafka ready"
+        image: gcr.io/unblu-containerrepo-public/collaborationserver-centos7
+        imagePullPolicy: Always
+        name: wait-for-kafka
+      terminationGracePeriodSeconds: 3630
+      volumes:
+      - configMap:
+          defaultMode: 288
+          name: collaboration-server-config
+        name: collaboration-server-config
+      - configMap:
+          defaultMode: 511
+          name: pre-stop
+        name: pre-stop

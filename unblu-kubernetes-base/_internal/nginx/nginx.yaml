@@ -1,0 +1,102 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nginx
+  annotations:
+    prometheus.io/probe: "true"
+    prometheus.io/path: "/unblu/rest/product"
+    prometheus.io/probename: "Unblu"
+spec:
+  type: ClusterIP
+  ports:
+  - name: 8080-tcp
+    port: 8080
+  selector:
+    app: unblu
+    component: nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9113"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - nginx
+              topologyKey: kubernetes.io/hostname
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+          defaultMode: 0777
+      containers:
+      - image: cluster/nginx
+        imagePullPolicy: Always
+        name: nginx
+        ports:
+        - name: nginx
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /nginx-health
+            port: nginx
+          initialDelaySeconds: 30
+        livenessProbe:
+          httpGet:
+            path: /nginx-health
+            port: nginx
+          initialDelaySeconds: 30
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 256Mi
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /opt/
+          readOnly: true
+      - name: nginx-exporter
+        image: nginx/nginx-prometheus-exporter
+        imagePullPolicy: Always
+        ports:
+        - name: prom-exporter
+          containerPort: 9113
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: prom-exporter
+          initialDelaySeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: prom-exporter
+          initialDelaySeconds: 15
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi

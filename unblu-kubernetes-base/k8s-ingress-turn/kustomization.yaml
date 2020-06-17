@@ -1,0 +1,9 @@
+bases:
+- ../_internal/turn
+
+commonLabels:
+  app: unblu
+  component: turn
+
+patchesStrategicMerge:
+- service.yaml

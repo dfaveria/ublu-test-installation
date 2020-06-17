@@ -1,0 +1,6 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nginx
+  annotations:
+    beta.cloud.google.com/backend-config: '{"ports": {"8080":"load-balancer-config"}}'

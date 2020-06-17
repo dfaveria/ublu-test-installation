@@ -1,0 +1,27 @@
+:source-highlighter: rouge
+
+= Unblu Graceful Shutdown
+Michael Gysel <michael.gysel@unblu.com>
+
+All samples are prepared using the Kubernetes CLI. 
+To use it with OpenShift, simply replace `kubectl` with `oc`.
+
+== Graceful restart
+
+.List Collaboration Server pods
+[source,bash]
+----
+kubectl get pods -l "component=collaboration-server"
+----
+
+.Send the restart command
+[source,bash]
+----
+kubectl exec -it collaboration-server-5f7df556df-476s9 \
+    -- curl http://localhost:9001/sys-unblu/gracefulShutdown/shutdown/600 # <1>
+----
+<1> `600` is the shutdown timeout in seconds.
+
+== Graceful shutdown
+
+A graceful shutdown is not yet supported but will be implemented using a Kubernetes `preStop` hook.
