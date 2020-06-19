@@ -6,7 +6,7 @@ spec:
 # Add the host key to specify a host name.
 # By default OpenShift will generate a host name for you
 # with the format: <route-name>[-<namespace>].<suffix>
-  host: unblu.example.com
+  host: unblu.ocp.example.com
 #
 # Add the following TLS block to use a specific certificate.
 # By default OpenShift will use the router's default certificate.
