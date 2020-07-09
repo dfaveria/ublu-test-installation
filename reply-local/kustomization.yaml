@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: unblu-test-2
+namespace: unblu-test-3
 
 bases: 
 - ../unblu-kubernetes-base/collaboration-server
