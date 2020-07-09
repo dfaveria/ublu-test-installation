@@ -13,6 +13,7 @@ patchesStrategicMerge:
 - route.yaml
 - limit-replicas.yaml
 - grafana-secret.yaml
+- singlenode.yaml
 
 resources:
 - database-secret.yaml
